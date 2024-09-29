@@ -7,7 +7,7 @@ mongoose.connect('mongodb+srv://admin:wwwwww@cluster0.weppimj.mongodb.net/chatBo
 
 const listingSchema = new mongoose.Schema({
     city: { type: String, required: true },
-    district: { type: String, required: true },  // Добавлено поле для округа или района
+    district: { type: String, required: true },
     photo: { type: String, required: true },
     description: { type: String, required: true },
 });
@@ -20,7 +20,6 @@ let awaitingPhoto = false;
 let awaitingDescription = false;
 let newListing = {};
 
-// Начало общения с пользователем
 addBot.start((ctx) => {
     ctx.reply('Привет! Я помогу добавить новое объявление. Выберите город:', {
         reply_markup: {
@@ -34,7 +33,7 @@ addBot.start((ctx) => {
     });
 });
 
-// Обработка выбора города
+
 addBot.action('city_MSK_MO', (ctx) => {
     newListing.city = 'Москва и МО';
     ctx.reply('Выберите административный округ:', {
@@ -53,16 +52,16 @@ addBot.action('city_MSK_MO', (ctx) => {
     });
 });
 
-// Обработка выбора административного округа
+
 addBot.action(/district_.+/, (ctx) => {
     const district = ctx.match[0].split('_')[1];
-    newListing.district = district;  // Сохраняем выбранный округ/район
+    newListing.district = district;  
 
     ctx.reply('Теперь отправьте ссылку на фото для объявления:');
     awaitingPhoto = true;
 });
 
-// Обработка текста
+
 addBot.on('text', async (ctx) => {
     if (awaitingPhoto) {
         newListing.photo = ctx.message.text;
@@ -81,7 +80,7 @@ addBot.on('text', async (ctx) => {
     }
 });
 
-// Обработка выбора города для Санкт-Петербурга
+
 addBot.action('city_SPB', (ctx) => {
     newListing.city = 'Санкт-Петербург';
     ctx.reply('Выберите район Санкт-Петербурга:', {
@@ -95,7 +94,7 @@ addBot.action('city_SPB', (ctx) => {
     });
 });
 
-// Обработка выбора города для Сочи
+
 addBot.action('city_Sochi', (ctx) => {
     newListing.city = 'Сочи';
     ctx.reply('Выберите район Сочи:', {
@@ -109,7 +108,6 @@ addBot.action('city_Sochi', (ctx) => {
     });
 });
 
-// Обработка выбора города для Калининграда
 addBot.action('city_Kaliningrad', (ctx) => {
     newListing.city = 'Калининград';
     ctx.reply('В Калининграде доступен только один ЖК.');
@@ -117,5 +115,5 @@ addBot.action('city_Kaliningrad', (ctx) => {
     awaitingPhoto = true;
 });
 
-// Запуск бота
+
 addBot.launch();
