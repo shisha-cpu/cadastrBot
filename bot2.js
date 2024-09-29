@@ -1,14 +1,13 @@
 const { Telegraf } = require('telegraf');
 const mongoose = require('mongoose');
 
-
 mongoose.connect('mongodb+srv://admin:wwwwww@cluster0.weppimj.mongodb.net/chatBot?retryWrites=true&w=majority&appName=Cluster0')
     .then(() => console.log('DB connected'))
     .catch((err) => console.log('DB error', err));
 
 const listingSchema = new mongoose.Schema({
     city: { type: String, required: true },
-    price: { type: String, required: true },
+    district: { type: String, required: true },  // Добавлено поле для округа или района
     photo: { type: String, required: true },
     description: { type: String, required: true },
 });
@@ -17,52 +16,53 @@ const Listing = mongoose.model('Listing', listingSchema);
 
 const addBot = new Telegraf('7762059907:AAHDTy7uXhuWjxsIsIL4VzkPyNj8oJEG0kk');
 
-
 let awaitingPhoto = false;
 let awaitingDescription = false;
-
 let newListing = {};
 
-
+// Начало общения с пользователем
 addBot.start((ctx) => {
     ctx.reply('Привет! Я помогу добавить новое объявление. Выберите город:', {
         reply_markup: {
             inline_keyboard: [
-                [{ text: 'МСК', callback_data: 'city_MSK' }],
-                [{ text: 'СПБ', callback_data: 'city_SPB' }],
-                [{ text: 'Калининград', callback_data: 'city_Kaliningrad' }],
+                [{ text: 'Москва и МО', callback_data: 'city_MSK_MO' }],
+                [{ text: 'Санкт-Петербург', callback_data: 'city_SPB' }],
                 [{ text: 'Сочи', callback_data: 'city_Sochi' }],
+                [{ text: 'Калининград', callback_data: 'city_Kaliningrad' }],
             ],
         },
     });
 });
 
-addBot.action(/city_.+/, (ctx) => {
-    const city = ctx.match[0].split('_')[1];
-    newListing.city = city;
-
-    ctx.reply('Выберите ценовой диапазон:', {
+// Обработка выбора города
+addBot.action('city_MSK_MO', (ctx) => {
+    newListing.city = 'Москва и МО';
+    ctx.reply('Выберите административный округ:', {
         reply_markup: {
             inline_keyboard: [
-                [{ text: 'до 3 млн', callback_data: 'price_3' }],
-                [{ text: 'до 4 млн', callback_data: 'price_4' }],
-                [{ text: 'до 5 млн', callback_data: 'price_5' }],
-                [{ text: 'до 6 млн', callback_data: 'price_6' }],
+                [{ text: 'СЗАО', callback_data: 'district_SZAO' }],
+                [{ text: 'СВАО', callback_data: 'district_SVAO' }],
+                [{ text: 'ЮЗАО', callback_data: 'district_YZAO' }],
+                [{ text: 'НАО', callback_data: 'district_NAO' }],
+                [{ text: 'САО', callback_data: 'district_SAO' }],
+                [{ text: 'ЦАО', callback_data: 'district_CAO' }],
+                [{ text: 'ВАО', callback_data: 'district_VAO' }],
+                [{ text: 'ЮАО', callback_data: 'district_YAO' }],
             ],
         },
     });
 });
 
-
-addBot.action(/price_.+/, (ctx) => {
-    const priceRange = ctx.match[0].split('_')[1] + ' млн';
-    newListing.price = priceRange;
+// Обработка выбора административного округа
+addBot.action(/district_.+/, (ctx) => {
+    const district = ctx.match[0].split('_')[1];
+    newListing.district = district;  // Сохраняем выбранный округ/район
 
     ctx.reply('Теперь отправьте ссылку на фото для объявления:');
     awaitingPhoto = true;
 });
 
-
+// Обработка текста
 addBot.on('text', async (ctx) => {
     if (awaitingPhoto) {
         newListing.photo = ctx.message.text;
@@ -72,7 +72,6 @@ addBot.on('text', async (ctx) => {
     } else if (awaitingDescription) {
         newListing.description = ctx.message.text;
 
-        
         const listing = new Listing(newListing);
         await listing.save();
 
@@ -82,5 +81,41 @@ addBot.on('text', async (ctx) => {
     }
 });
 
+// Обработка выбора города для Санкт-Петербурга
+addBot.action('city_SPB', (ctx) => {
+    newListing.city = 'Санкт-Петербург';
+    ctx.reply('Выберите район Санкт-Петербурга:', {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: 'Центральный', callback_data: 'district_Central' }],
+                [{ text: 'Адмиралтейский', callback_data: 'district_Admiral' }],
+                [{ text: 'Василеостровский', callback_data: 'district_Vasileostrovsky' }],
+            ],
+        },
+    });
+});
 
+// Обработка выбора города для Сочи
+addBot.action('city_Sochi', (ctx) => {
+    newListing.city = 'Сочи';
+    ctx.reply('Выберите район Сочи:', {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: 'Хостинский', callback_data: 'district_Khostinsky' }],
+                [{ text: 'Центральный', callback_data: 'district_Central_Sochi' }],
+                [{ text: 'Адлеровский', callback_data: 'district_Adler' }],
+            ],
+        },
+    });
+});
+
+// Обработка выбора города для Калининграда
+addBot.action('city_Kaliningrad', (ctx) => {
+    newListing.city = 'Калининград';
+    ctx.reply('В Калининграде доступен только один ЖК.');
+    ctx.reply('Теперь отправьте ссылку на фото для объявления:');
+    awaitingPhoto = true;
+});
+
+// Запуск бота
 addBot.launch();
