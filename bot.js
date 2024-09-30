@@ -56,7 +56,7 @@ bot.action('reviews', (ctx) => {
 });
 bot.action('form', (ctx) => {
     ctx.reply('Юрист о «нашем формате.');
-    ctx.replyWithVideo({ source: './10.mp4' });
+    ctx.replyWithVideo({ source: './form.mp4' });
 
 });
 

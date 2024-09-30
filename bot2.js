@@ -110,6 +110,7 @@ addBot.action('city_Sochi', (ctx) => {
 
 addBot.action('city_Kaliningrad', (ctx) => {
     newListing.city = 'Калининград';
+    newListing.district = 'Центральный'; 
     ctx.reply('В Калининграде доступен только один ЖК.');
     ctx.reply('Теперь отправьте ссылку на фото для объявления:');
     awaitingPhoto = true;
