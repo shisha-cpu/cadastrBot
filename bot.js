@@ -1,22 +1,25 @@
 const { Telegraf } = require('telegraf');
 const mongoose = require('mongoose');
 
-
+// Подключение к базе данных
 mongoose.connect('mongodb+srv://admin:wwwwww@cluster0.weppimj.mongodb.net/chatBot?retryWrites=true&w=majority&appName=Cluster0')
     .then(() => console.log('DB connected'))
     .catch((err) => console.log('DB error', err));
 
-
+// Схема для пользователей
 const userSchema = new mongoose.Schema({
     chatId: { type: String, required: true },
     city: String,
     district: String,
-    consultationRequested: Boolean
+    consultationRequested: Boolean,
+    fullName: String,
+    phone: String,
+    awaitingInput: String  // новое поле для отслеживания состояния
 });
 
 const User = mongoose.model('User', userSchema);
 
-
+// Схема для объявлений
 const listingSchema = new mongoose.Schema({
     city: { type: String, required: true },
     district: String,
@@ -27,9 +30,19 @@ const listingSchema = new mongoose.Schema({
 
 const Listing = mongoose.model('Listing', listingSchema);
 
-
+// Инициализация бота с токеном
 const bot = new Telegraf('7518600478:AAHdnYnYtcf5mBpDXsCc-4xRQQ3AWrOgtmc');
 
+// Предопределенный chatId для отправки данных админу
+const adminChatId = '1137493485';
+
+// Логирование chatId
+bot.use((ctx, next) => {
+    console.log(`User chatId: ${ctx.chat.id}`);
+    return next();
+});
+
+// Начальное сообщение при старте
 bot.start((ctx) => {
     ctx.reply('Регистрируем документы на каждую студию в Росреестре. Вы получаете законные метры и прописку и льготы в Москве.', {
         reply_markup: {
@@ -43,23 +56,23 @@ bot.start((ctx) => {
     });
 });
 
-
+// Видео, отзывы и форма
 bot.action('videos', (ctx) => {
     ctx.reply('Вот видео наших объектов.');
     ctx.replyWithVideo({ source: './obj1.mp4' });
 });
 
-
 bot.action('reviews', (ctx) => {
     ctx.reply('Вот отзывы наших клиентов.');
     ctx.replyWithVideo({ source: './10.mp4' });
 });
+
 bot.action('form', (ctx) => {
     ctx.reply('Юрист о «нашем формате.');
     ctx.replyWithVideo({ source: './form.mp4' });
-
 });
 
+// Выбор города
 bot.action('choose_city', (ctx) => {
     ctx.reply('Выберите город:', {
         reply_markup: {
@@ -73,6 +86,7 @@ bot.action('choose_city', (ctx) => {
     });
 });
 
+// Обработка выбора города
 bot.action(/city_(.+)/, async (ctx) => {
     const city = ctx.match[1];
     await User.updateOne({ chatId: ctx.chat.id }, { city }, { upsert: true });
@@ -111,14 +125,22 @@ bot.action(/city_(.+)/, async (ctx) => {
             }
         });
     } else if (city === 'Kaliningrad') {
+        await User.updateOne({ chatId: ctx.chat.id }, { district: 'Центральный' }, { upsert: true });
         ctx.reply('Доступен только один ЖК в Калининграде.');
+        await showListings(ctx);  // Показ объявлений для Калининграда сразу
     }
 });
 
+// Показ объявлений для выбранного района
 bot.action(/district_.+/, async (ctx) => {
     const district = ctx.match[0].split('_')[1];
     await User.updateOne({ chatId: ctx.chat.id }, { district }, { upsert: true });
 
+    await showListings(ctx);  // Показ объявлений
+});
+
+// Функция показа объявлений
+async function showListings(ctx) {
     const user = await User.findOne({ chatId: ctx.chat.id });
     const listings = await Listing.find({ district: user.district });
 
@@ -130,6 +152,7 @@ bot.action(/district_.+/, async (ctx) => {
         ctx.reply('Извините, по выбранным параметрам ничего не найдено.');
     }
 
+    // Показ кнопок "Задать вопрос" и "Записаться на консультацию"
     ctx.reply('Задать вопрос или записаться на консультацию?', {
         reply_markup: {
             inline_keyboard: [
@@ -138,9 +161,9 @@ bot.action(/district_.+/, async (ctx) => {
             ]
         }
     });
-});
+}
 
-
+// Обработка вопросов и консультаций
 bot.action('faq', (ctx) => {
     ctx.reply('Вот PDF файл с ответами на вопросы.', {
         reply_markup: {
@@ -151,15 +174,33 @@ bot.action('faq', (ctx) => {
     });
 });
 
-
 bot.action('download_pdf', (ctx) => {
     ctx.replyWithDocument({ source: './Brevis_Apartments_.pdf' });
 });
 
+// Обработка консультаций
 bot.action('consult', async (ctx) => {
-    await User.updateOne({ chatId: ctx.chat.id }, { consultationRequested: true });
-    ctx.reply('Мы свяжемся с вами для консультации.');
+    await User.updateOne({ chatId: ctx.chat.id }, { consultationRequested: true, awaitingInput: 'fullName' });
+    ctx.reply('Пожалуйста, введите ваше ФИО:');
 });
 
+// Обработка текстового ввода пользователя (ФИО и телефон)
+bot.on('text', async (ctx) => {
+    const user = await User.findOne({ chatId: ctx.chat.id });
 
+    if (user.awaitingInput === 'fullName') {
+        // Обработка ФИО
+        await User.updateOne({ chatId: ctx.chat.id }, { fullName: ctx.message.text, awaitingInput: 'phone' });
+        ctx.reply('Теперь введите ваш номер телефона:');
+    } else if (user.awaitingInput === 'phone') {
+        // Обработка телефона
+        await User.updateOne({ chatId: ctx.chat.id }, { phone: ctx.message.text, awaitingInput: null });
+        ctx.reply('Спасибо! Ваши данные отправлены.');
+
+        // Отправка данных админу
+        bot.telegram.sendMessage(adminChatId, `Новая заявка на консультацию:\nФИО: ${user.fullName}\nТелефон: ${ctx.message.text}`);
+    }
+});
+
+// Запуск бота
 bot.launch();
