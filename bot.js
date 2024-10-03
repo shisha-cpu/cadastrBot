@@ -139,22 +139,22 @@ bot.action(/district_.+/, async (ctx) => {
 });
 
 
-// Функция показа объявлений
 
+// Функция показа объявлений
 async function showListings(ctx) {
     const user = await User.findOne({ chatId: ctx.chat.id });
     const listings = await Listing.find({ district: user.district });
 
     if (listings.length > 0) {
         for (const listing of listings) {
-            const caption = `${listing.description}\nЦена: ${listing.price}`;
+            const caption = `${listing.description}`; // Оставили только описание
 
             // Удаление дубликатов из массива фотографий
             const uniquePhotos = [...new Set(listing.photos)];
 
             // Подготовка массива фотографий для отправки
             const media = uniquePhotos.map((photo, index) => {
-                return { type: 'photo', media: photo, caption: index === 0 ? caption : undefined }; // Добавляем заголовок только к первому фото
+                return { type: 'photo', media: photo, caption: index === 0 ? caption : undefined }; // Заголовок только для первого фото
             });
             
             // Отправка всех фотографий в одном сообщении
