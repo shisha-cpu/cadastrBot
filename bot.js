@@ -25,7 +25,7 @@ const listingSchema = new mongoose.Schema({
     district: String,
     description: String,
     price: String,
-    photo: String
+    photos: [String]  // Массив ссылок на фотографии
 });
 
 const Listing = mongoose.model('Listing', listingSchema);
@@ -34,7 +34,7 @@ const Listing = mongoose.model('Listing', listingSchema);
 const bot = new Telegraf('7518600478:AAHdnYnYtcf5mBpDXsCc-4xRQQ3AWrOgtmc');
 
 // Предопределенный chatId для отправки данных админу
-const adminChatId = '1137493485';
+const adminChatId = '1098841237';
 
 // Логирование chatId
 bot.use((ctx, next) => {
@@ -63,8 +63,7 @@ bot.action('videos', (ctx) => {
 });
 
 bot.action('reviews', (ctx) => {
-    ctx.reply('Вот отзывы наших клиентов.');
-    ctx.replyWithVideo({ source: './10.mp4' });
+    ctx.reply('Пока нет отзывов');
 });
 
 bot.action('form', (ctx) => {
@@ -139,14 +138,27 @@ bot.action(/district_.+/, async (ctx) => {
     await showListings(ctx);  // Показ объявлений
 });
 
+
 // Функция показа объявлений
+
 async function showListings(ctx) {
     const user = await User.findOne({ chatId: ctx.chat.id });
     const listings = await Listing.find({ district: user.district });
 
     if (listings.length > 0) {
         for (const listing of listings) {
-            await ctx.replyWithPhoto(listing.photo, { caption: `${listing.description}\nЦена: ${listing.price}` });
+            const caption = `${listing.description}\nЦена: ${listing.price}`;
+
+            // Удаление дубликатов из массива фотографий
+            const uniquePhotos = [...new Set(listing.photos)];
+
+            // Подготовка массива фотографий для отправки
+            const media = uniquePhotos.map((photo, index) => {
+                return { type: 'photo', media: photo, caption: index === 0 ? caption : undefined }; // Добавляем заголовок только к первому фото
+            });
+            
+            // Отправка всех фотографий в одном сообщении
+            await ctx.replyWithMediaGroup(media);
         }
     } else {
         ctx.reply('Извините, по выбранным параметрам ничего не найдено.');
@@ -162,6 +174,7 @@ async function showListings(ctx) {
         }
     });
 }
+
 
 // Обработка вопросов и консультаций
 bot.action('faq', (ctx) => {
